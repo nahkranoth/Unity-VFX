@@ -35,7 +35,7 @@ public class MyBlitFeature : ScriptableRendererFeature
             // we can do nothing this frame if we want
             return;
         }
-    
+        
         // Gather up and pass any extra information our pass will need.
         // In this case we're getting the camera's color buffer target
         var cameraColorTargetIdent = renderer.cameraColorTarget;
