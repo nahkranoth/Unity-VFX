@@ -6,13 +6,6 @@ public class FrustrumDebug : MonoBehaviour
 {
     public Camera cam;
 
-    public Vector3 lookAngle;
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
-
     // Update is called once per frame
     void Update()
     {
@@ -38,9 +31,8 @@ public class FrustrumDebug : MonoBehaviour
             for (var j = 0; j <= 6; j++)
             {
                 var nearPos = origin + new Vector3(i * nearFrustWidthNormalized, j * nearFrustHeightNormalized, 0);
-                
-                var ang = Quaternion.Euler(lookAngle) * Vector3.forward;
-                Debug.DrawRay(nearPos, ang, Color.red);
+                var dir = nearPos - transform.position;
+                Debug.DrawRay(nearPos, dir, Color.red);
             }
         }
         
