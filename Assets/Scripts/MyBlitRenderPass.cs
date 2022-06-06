@@ -44,10 +44,22 @@ class MyBlitRenderPass : ScriptableRenderPass
     CommandBuffer cmd = CommandBufferPool.Get(profilerTag);
     cmd.Clear();
     
+    var materials = MyBlitMaterials.Instance;
+    if (materials == null)
+    {
+      Debug.LogError("Custom Post Processing Materials instance is null");
+      return;
+    }
+    
     // the actual content of our custom render pass!
     // we apply our material while blitting to a temporary texture
     cmd.Blit(cameraColorTargetIdent, tempTexture.Identifier(), materialToBlit, 0);
 
+    var material = materials.customEffect;
+    
+    material.SetFloat(Shader.PropertyToID("_CamFieldOfView"), Camera.main.fieldOfView);
+    
+    
     // ...then blit it back again 
     cmd.Blit(tempTexture.Identifier(), cameraColorTargetIdent);
 

@@ -1,4 +1,5 @@
-﻿void rX(inout float3 p, float a) {
+﻿
+void rX(inout float3 p, float a) {
 	float3 q = p;
 	float c = cos(a);
 	float s = sin(a);
@@ -40,7 +41,7 @@ float sdTorus(float3 p, float2 t)
 	return length(q) - t.y;
 }
 
-float3 raymarchStep(float2 rayPosition, float3 offset, float3 rotation, float time)
+float3 raymarchStep(float2 rayPosition, float3 offset, float3 rayDirection, float time)
 {
 	const int MAXSTEPS = 99;
 	const float DISTANCE_THRESHOLD = 0.1;
@@ -52,15 +53,17 @@ float3 raymarchStep(float2 rayPosition, float3 offset, float3 rotation, float ti
 	
 	for(int i=0;i<MAXSTEPS;i++)
 	{
-		float3 ray = offset + float3(rayPosition, 1.) * dist;
+		float3 ray = offset + float3(rayPosition, 1.) * rayDirection * dist;
 
 		rX(ray,time);
+		rZ(ray,time);
+		
 		float ns = sdTorus(ray, float2(1, 0.2));
 		dist += ns;
 		
 		if (ns < DISTANCE_THRESHOLD) {
 			clr = float3(1,1,1);
-			break;
+			break; 
 		}
 		if (dist > FAR_CLIP) {
 			//miss as we've gone past rear clip
@@ -71,8 +74,27 @@ float3 raymarchStep(float2 rayPosition, float3 offset, float3 rotation, float ti
 	return clr;
 }
 
-void RayMarch_float(float2 UV, float3 CameraWorldPos, float3 CameraDirection, float4x4 CameraFrustrum, float Time, out float3 clr)
+#define PITwo 6.2831853076
+
+void RayMarch_float(float2 UV, float3 CameraWorldPos, float3 CameraDirection, float CamNearClip, float CamAspect, float CamFOV, float2 ScreenSize, float Time, out float3 clr)
 {
+
 	float2 rayCoordinate = UV * 2. - 1;
-	clr = raymarchStep(rayCoordinate, CameraWorldPos, CameraDirection, Time);
+
+	float frustumHeight = CamNearClip * tan(CamFOV * 0.5f * (PITwo * 2) / 360.);
+	float frustumWidth = frustumHeight * CamAspect;
+
+	float3 topLeft = float3(-frustumWidth, frustumHeight, CamNearClip);
+	float3 topRight = float3(frustumWidth, frustumHeight, CamNearClip);
+	float3 bottomLeft = float3(-frustumWidth, -frustumHeight, CamNearClip);
+
+	float3 origin = CameraWorldPos + topLeft;
+
+	float nearFrustWidthNormalized = (topRight.x / ScreenSize.x) * 2;
+	float nearFrustHeightNormalized = (bottomLeft.y / ScreenSize.y) * 2;
+
+	float3 nearPos = origin + float3(UV.x * nearFrustWidthNormalized, UV.y * nearFrustHeightNormalized, 0);
+	float3 rayDirection = nearPos - CameraWorldPos;
+	
+	clr = raymarchStep(rayCoordinate, CameraWorldPos, rayDirection, Time);
 }

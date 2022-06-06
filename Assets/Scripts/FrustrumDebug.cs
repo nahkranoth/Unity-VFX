@@ -9,17 +9,17 @@ public class FrustrumDebug : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        float camFov = cam.fieldOfView;
         float camAspect = cam.aspect;
-        float camNear = cam.nearClipPlane;
         
-        var frustumHeight = cam.nearClipPlane * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        float camNear = cam.nearClipPlane;
+        float camFieldView = cam.fieldOfView;
+        
+        var frustumHeight = camNear * Mathf.Tan(camFieldView * 0.5f * Mathf.Deg2Rad);
         var frustumWidth = frustumHeight * camAspect;
 
         Vector3 topLeft = new Vector3(-frustumWidth, frustumHeight, camNear);
         Vector3 topRight = new Vector3(frustumWidth, frustumHeight, camNear);
         Vector3 bottomLeft = new Vector3(-frustumWidth, -frustumHeight, camNear);
-        Vector3 bottomRight = new Vector3(frustumWidth, -frustumHeight, camNear);
 
         Vector3 origin = transform.position + topLeft;
 
@@ -32,7 +32,7 @@ public class FrustrumDebug : MonoBehaviour
             {
                 var nearPos = origin + new Vector3(i * nearFrustWidthNormalized, j * nearFrustHeightNormalized, 0);
                 var dir = nearPos - transform.position;
-                Debug.DrawRay(nearPos, dir, Color.red);
+                Debug.DrawRay(nearPos, dir * 1000f, Color.red);
             }
         }
         
