@@ -2,3 +2,7 @@
 I'm trying to do this through a Post Processing effect.
 
 This is still W.I.P.
+
+**Instructions**
+
+To make this work switch to the local rendering pipeline
