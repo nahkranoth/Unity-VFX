@@ -1,0 +1,25 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+Texture2D<float4> Source;
+Texture2D<float4> Warp;
+RWTexture2D<float4> Result;
+int width;
+int height;
+float time;
+
+SamplerState linearMirror;
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    float2 uv = float2(id.xy)/float2(width,height);
+
+    float2 warp = Warp.SampleLevel( linearMirror, sin(uv*0.8 + time*float2(0.4,0.3)), 0 );
+    float2 st = uv + warp*0.1;
+    float4 clr = Source.SampleLevel(linearMirror, st, 0);
+    
+    Result[id.xy] = clr;
+}
