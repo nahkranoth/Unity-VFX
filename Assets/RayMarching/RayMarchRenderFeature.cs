@@ -1,25 +1,25 @@
 using System;
-using Unity.Jobs.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-public class CustomWarp : ScriptableRendererFeature
+public class RayMarchRenderFeature : ScriptableRendererFeature
 {
-
     class CustomRenderPass : ScriptableRenderPass
     {
-        private WarpSettings settings;
+        private RayMarchSettings settings;
         private RenderTargetIdentifier cameraTex;
-        private RenderTextureDescriptor camSettings;
+        private CameraData cameraData;
+        private RenderTextureDescriptor camTextureDescript;
         private RenderTargetIdentifier tempOne;
         private RenderTargetHandle handle;
-        public CustomRenderPass(WarpSettings settings)
+
+        public CustomRenderPass(RayMarchSettings settings)
         {
             this.settings = settings;
             handle.Init("Handle");
         }
-
+        
         // This method is called before executing the render pass.
         // It can be used to configure render targets and their clear state. Also to create temporary render target textures.
         // When empty this render pass will render to the active camera render target.
@@ -27,32 +27,65 @@ public class CustomWarp : ScriptableRendererFeature
         // The render pipeline will ensure target setup and clearing happens in a performant manner.
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
-            camSettings = renderingData.cameraData.cameraTargetDescriptor;
+            camTextureDescript = renderingData.cameraData.cameraTargetDescriptor;
             cameraTex = renderingData.cameraData.renderer.cameraColorTarget;
-            camSettings.enableRandomWrite = true;
-            cmd.GetTemporaryRT(handle.id, camSettings, FilterMode.Bilinear);
+            cameraData = renderingData.cameraData;
+            camTextureDescript.enableRandomWrite = true;
+            cmd.GetTemporaryRT(handle.id, camTextureDescript, FilterMode.Bilinear);
         }
 
         // Here you can implement the rendering logic.
         // Use <c>ScriptableRenderContext</c> to issue drawing commands or execute command buffers
         // https://docs.unity3d.com/ScriptReference/Rendering.ScriptableRenderContext.html
         // You don't have to call ScriptableRenderContext.submit, the render pipeline will call it at specific points in the pipeline.
+        
+        private Matrix4x4 GetFrustumCorners(Camera cam)
+        {
+            //TODO: Make sure this code does what you think it should do
+            float camFov = cam.fieldOfView;
+            float camAspect = cam.aspect;
+
+            Matrix4x4 frustumCorners = Matrix4x4.identity;
+
+            float fovWHalf = camFov * 0.5f;
+
+            float tan_fov = Mathf.Tan(fovWHalf * Mathf.Deg2Rad);
+
+            Vector3 toRight = Vector3.right * tan_fov * camAspect;
+            Vector3 toTop = Vector3.up * tan_fov;
+
+            Vector3 topLeft = (-Vector3.forward - toRight + toTop);
+            Vector3 topRight = (-Vector3.forward + toRight + toTop);
+            Vector3 bottomLeft = (-Vector3.forward - toRight - toTop);
+            Vector3 bottomRight = (-Vector3.forward + toRight - toTop);
+
+            frustumCorners.SetRow(0, topLeft);
+            frustumCorners.SetRow(1, topRight);
+            frustumCorners.SetRow(2, bottomLeft);
+            frustumCorners.SetRow(3, bottomRight);
+
+            return frustumCorners;
+        }
+        
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
-            CommandBuffer cmd = CommandBufferPool.Get("Custom Warp pass");
+            CommandBuffer cmd = CommandBufferPool.Get("Custom Raymarch pass");
             cmd.Clear();
             
             cmd.SetComputeTextureParam(settings.cShader, 0, "Source", cameraTex);
-            cmd.SetComputeTextureParam(settings.cShader, 0, "Warp", settings.warp);
             cmd.SetComputeTextureParam(settings.cShader, 0, "Result", handle.Identifier());
-            cmd.SetComputeIntParam(settings.cShader, "width", camSettings.width);
-            cmd.SetComputeIntParam(settings.cShader, "height", camSettings.height);
-            cmd.SetComputeFloatParam(settings.cShader, "time", Time.time);
+            cmd.SetComputeIntParam(settings.cShader, "width", camTextureDescript.width);
+            cmd.SetComputeIntParam(settings.cShader, "height", camTextureDescript.height);
+            cmd.SetComputeVectorParam(settings.cShader, "CameraWorldPos", cameraData.camera.transform.position);
+            cmd.SetComputeMatrixParam(settings.cShader, "CameraViewMatrix", cameraData.camera.cameraToWorldMatrix);
+            cmd.SetComputeMatrixParam(settings.cShader, "FrustumCornersES", GetFrustumCorners(cameraData.camera));
             
-            cmd.DispatchCompute(settings.cShader, 0, camSettings.width/8, camSettings.height/8, 1);
+            //Do your thing
             
+            cmd.DispatchCompute(settings.cShader, 0, camTextureDescript.width/8, camTextureDescript.height/8, 1);
             cmd.Blit(handle.Identifier(), cameraTex);
-            // don't forget to tell ScriptableRenderContext to actually execute the commands
+            
+            //execute command buffer
             context.ExecuteCommandBuffer(cmd);
             // tidy up after ourselves
             cmd.Clear();
@@ -67,20 +100,21 @@ public class CustomWarp : ScriptableRendererFeature
     }
 
     [Serializable]
-    public struct WarpSettings
+    public struct RayMarchSettings
     {
         public RenderPassEvent rPEvent;
         public ComputeShader cShader;
-        public Texture2D warp;
     }
 
-    public WarpSettings settings = new WarpSettings();
+    public RayMarchSettings settings = new RayMarchSettings();
+    
     CustomRenderPass m_ScriptablePass;
 
     /// <inheritdoc/>
     public override void Create()
     {
         m_ScriptablePass = new CustomRenderPass(settings);
+
         // Configures where the render pass should be injected.
         m_ScriptablePass.renderPassEvent = settings.rPEvent;
     }

@@ -1,0 +1,76 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+SamplerState linearMirror;
+
+float sdTorus(float3 p, float2 t)
+{
+    float2 q = float2(length(p.xz) - t.x, p.y);
+    return length(q) - t.y;
+}
+
+float map(float3 p) {
+    return sdTorus(p, float2(1, 0.2));
+}
+
+float4 raymarch(float3 ro, float3 rd) {
+    float4 ret = float4(0,0,0,0);
+
+    const int maxstep = 64;
+    float t = 0; // current distance traveled along ray
+    for (int i = 0; i < maxstep; ++i) {
+        float3 p = ro + rd * t; // World space position of sample
+        float d = map(p);       // Sample of distance field (see map())
+
+        // If the sample <= 0, we have hit something (see map()).
+        if (d < 0.001) {
+            // Simply return a gray color if we have hit an object
+            // We will deal with lighting later.
+            ret = float4(0.5, 0.5, 0.5, 1);
+            break;
+        }
+
+        // If the sample > 0, we haven't hit anything yet so we should march forward
+        // We step forward by distance d, because d is the minimum distance possible to intersect
+        // an object (see map()).
+        t += d;
+    }
+
+    return ret;
+}
+
+Texture2D<float4> Source;
+RWTexture2D<float4> Result;
+
+float4 CameraWorldPos;
+float4x4 CameraViewMatrix;
+float4x4 FrustumCornersES;
+int width;
+int height;
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    float2 uv = float2(id.xy)/float2(width,height);
+
+    float3 topLeft = FrustumCornersES[0].xyz;
+    float3 topRight = FrustumCornersES[1].xyz;
+    float3 bottomLeft = FrustumCornersES[2].xyz;
+
+    float3 xFrustDir = topLeft - (topLeft - topRight) * uv.x;
+    float3 yFrustDir = topLeft - (topLeft - bottomLeft) * uv.y;
+    float3 res = float3(xFrustDir.x, yFrustDir.y, yFrustDir.z);
+    
+    float3 rayFinal = mul(CameraViewMatrix, res);
+
+    // // ray direction
+    // // ray origin (camera position)
+    float3 ro = CameraWorldPos.xyz;
+    ro.y = -ro.y;
+    float4 add = raymarch(ro, rayFinal);
+    float4 clr = Source.SampleLevel(linearMirror, uv, 0);
+    float4 comb = float4(clr*(1.0 - add.w) + add.xyz * add.w,1.0);
+    
+    Result[id.xy] = comb;
+}
+

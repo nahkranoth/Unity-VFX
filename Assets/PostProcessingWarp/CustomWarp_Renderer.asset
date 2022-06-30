@@ -17,8 +17,6 @@ MonoBehaviour:
     rPEvent: 500
     cShader: {fileID: 7200000, guid: d657662d4f9fc8e4f9b93f470a1df604, type: 3}
     warp: {fileID: 2800000, guid: 08cfca89f6d92e34cac40e8f18e9a2d1, type: 3}
-    threshold: 0
-    intensity: 0
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
